@@ -6,7 +6,7 @@ const MONTHS = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb
 const MONTH_FULL = ["April","May","June","July","August","September","October","November","December","January","February","March"];
 const ADMIN_PASSWORD = "admin123";
 
-const TAX_YEARS = ["2021/22","2022/23","2023/24","2024/25","2025/26"];
+const TAX_YEARS = ["2021/22","2022/23","2023/24","2024/25","2025/26","2026/27"];
 
 const ALL_FIELDS = [
   { key:"rent",           label:"Rental Income",                 type:"income"  },
