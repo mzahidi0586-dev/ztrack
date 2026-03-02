@@ -38,6 +38,12 @@ const ALL_FIELDS = [
 
 const INCOME_FIELDS  = ALL_FIELDS.filter(f => f.type === "income");
 const EXPENSE_FIELDS = ALL_FIELDS.filter(f => f.type === "expense");
+const QUARTERS = [
+  { label: "Q1", months: ["Apr","May","Jun"], range: "Apr – Jun" },
+  { label: "Q2", months: ["Jul","Aug","Sep"], range: "Jul – Sep" },
+  { label: "Q3", months: ["Oct","Nov","Dec"], range: "Oct – Dec" },
+  { label: "Q4", months: ["Jan","Feb","Mar"], range: "Jan – Mar" },
+];
 const RRI_KEYS    = ["serviceCharges","councilTax","water","gas","electricity","insurance","contentsIns","broadband","tvLicence","groundRent"];
 const REPAIR_KEYS = ["repairs","gasCert","electricCert","replacement","cleaning"];
 const LEGAL_KEYS  = ["agentCommission","accountancy","otherExpenses","legalExpenses"];
@@ -56,6 +62,12 @@ function fmt(val) {
 }
 function num(v) { const n=parseFloat(v); return isNaN(n)?0:n; }
 function annualSum(data,key) { return MONTHS.reduce((s,m)=>s+num(data?.[m]?.[key]),0); }
+function quarterSum(data,key,months) { return months.reduce((s,m)=>s+num(data?.[m]?.[key]),0); }
+function quarterTotals(data,months) {
+  const ti=months.reduce((s,m)=>s+INCOME_FIELDS.reduce((ss,f)=>ss+num(data?.[m]?.[f.key]),0),0);
+  const te=months.reduce((s,m)=>s+EXPENSE_FIELDS.reduce((ss,f)=>ss+num(data?.[m]?.[f.key]),0),0);
+  return {income:ti,expenses:te,net:ti-te};
+}
 function calcTotals(data) {
   const ti=MONTHS.reduce((s,m)=>s+INCOME_FIELDS.reduce((ss,f)=>ss+num(data?.[m]?.[f.key]),0),0);
   const te=MONTHS.reduce((s,m)=>s+EXPENSE_FIELDS.reduce((ss,f)=>ss+num(data?.[m]?.[f.key]),0),0);
@@ -388,6 +400,99 @@ function PropertyDetail({property,data,onChange,onBack}) {
   );
 }
 
+// ─── Quarterly Report ─────────────────────────────────────────────────────────
+function QuarterlyReport({properties,allData,taxYear}) {
+  if(properties.length===0) return(
+    <div style={{padding:"80px 0",textAlign:"center",color:"#94a3b8",fontFamily:"'DM Sans',sans-serif"}}>
+      <div style={{fontSize:48,marginBottom:14}}>📊</div>
+      <div style={{fontSize:17,fontFamily:"'DM Serif Display',serif",color:"#475569"}}>No properties for {taxYear}</div>
+    </div>
+  );
+  return(
+    <div style={{padding:"28px 32px",fontFamily:"'DM Sans',sans-serif"}}>
+      <div style={{marginBottom:22}}>
+        <h2 style={{margin:0,fontFamily:"'DM Serif Display',serif",color:"#0f172a",fontSize:26}}>Quarterly Report</h2>
+        <p style={{margin:"5px 0 0",color:"#64748b",fontSize:13}}>Income & expenses by quarter · {taxYear}</p>
+      </div>
+      <div style={{display:"flex",flexDirection:"column",gap:24}}>
+        {QUARTERS.map(q=>{
+          const rows=properties.map(p=>{
+            const t=quarterTotals(allData[p.id]||{},q.months);
+            return{...p,...t};
+          });
+          const totalIncome=rows.reduce((s,r)=>s+r.income,0);
+          const totalExpenses=rows.reduce((s,r)=>s+r.expenses,0);
+          const totalNet=rows.reduce((s,r)=>s+r.net,0);
+          return(
+            <div key={q.label} style={{borderRadius:14,border:"1px solid #e2e8f0",overflow:"hidden",boxShadow:"0 1px 6px rgba(0,0,0,0.06)"}}>
+              <div style={{background:"#f8fafc",padding:"14px 20px",borderBottom:"1px solid #e2e8f0",display:"flex",alignItems:"center",gap:14}}>
+                <div style={{background:"#1e293b",color:"white",fontWeight:700,fontSize:13,padding:"4px 12px",borderRadius:7}}>{q.label}</div>
+                <div style={{fontSize:14,fontWeight:600,color:"#0f172a"}}>{q.range}</div>
+                <div style={{marginLeft:"auto",display:"flex",gap:10}}>
+                  {[{l:"Income",v:totalIncome,c:"#16a34a",bg:"#f0fdf4"},{l:"Expenses",v:totalExpenses,c:"#dc2626",bg:"#fef2f2"},{l:"Net",v:totalNet,c:totalNet>=0?"#16a34a":"#dc2626",bg:totalNet>=0?"#f0fdf4":"#fef2f2"}].map((s,i)=>(
+                    <div key={i} style={{background:s.bg,padding:"4px 12px",borderRadius:7,display:"flex",gap:6,alignItems:"center"}}>
+                      <span style={{fontSize:10,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.8,fontWeight:600}}>{s.l}</span>
+                      <span style={{fontSize:13,fontWeight:700,color:s.c}}>{s.v!==0?fmt(s.v):"–"}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div style={{overflowX:"auto"}}>
+                <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
+                  <thead>
+                    <tr style={{background:"#f8fafc"}}>
+                      <th style={{padding:"10px 18px",textAlign:"left",color:"#475569",fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1.2,borderBottom:"1px solid #e2e8f0"}}>Property</th>
+                      {q.months.map(m=><th key={m} style={{padding:"10px 12px",textAlign:"right",color:"#475569",fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1.2,borderBottom:"1px solid #e2e8f0"}}>{m}</th>)}
+                      <th style={{padding:"10px 12px",textAlign:"right",color:"#16a34a",fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1.2,borderBottom:"1px solid #e2e8f0",borderLeft:"1px solid #e2e8f0"}}>Income</th>
+                      <th style={{padding:"10px 12px",textAlign:"right",color:"#dc2626",fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1.2,borderBottom:"1px solid #e2e8f0"}}>Expenses</th>
+                      <th style={{padding:"10px 12px",textAlign:"right",color:"#7c3aed",fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1.2,borderBottom:"1px solid #e2e8f0"}}>Net</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map((r,i)=>{
+                      const monthNets=q.months.map(m=>({
+                        m,
+                        v:INCOME_FIELDS.reduce((s,f)=>s+num(allData[r.id]?.[m]?.[f.key]),0)-EXPENSE_FIELDS.reduce((s,f)=>s+num(allData[r.id]?.[m]?.[f.key]),0)
+                      }));
+                      return(
+                        <tr key={r.id} style={{borderBottom:"1px solid #f1f5f9",background:i%2===0?"#fff":"#fafbfc"}}>
+                          <td style={{padding:"9px 18px",fontSize:13,color:r.color,fontWeight:600}}>{r.name}</td>
+                          {monthNets.map(({m,v})=>(
+                            <td key={m} style={{padding:"9px 12px",textAlign:"right",fontSize:12,color:v>0?"#16a34a":v<0?"#dc2626":"#cbd5e1",fontWeight:v!==0?600:400}}>{v!==0?fmt(v):"–"}</td>
+                          ))}
+                          <td style={{padding:"9px 12px",textAlign:"right",fontSize:13,fontWeight:700,color:r.income>0?"#16a34a":"#cbd5e1",borderLeft:"1px solid #e2e8f0"}}>{r.income>0?fmt(r.income):"–"}</td>
+                          <td style={{padding:"9px 12px",textAlign:"right",fontSize:13,fontWeight:700,color:r.expenses>0?"#dc2626":"#cbd5e1"}}>{r.expenses>0?fmt(r.expenses):"–"}</td>
+                          <td style={{padding:"9px 12px",textAlign:"right",fontSize:13,fontWeight:700,color:r.net>0?"#16a34a":r.net<0?"#dc2626":"#cbd5e1"}}>{r.net!==0?fmt(r.net):"–"}</td>
+                        </tr>
+                      );
+                    })}
+                    {properties.length>1&&(
+                      <tr style={{background:"#f8fafc",borderTop:"2px solid #e2e8f0"}}>
+                        <td style={{padding:"10px 18px",fontSize:13,fontWeight:700,color:"#1e293b"}}>Total</td>
+                        {q.months.map(m=>{
+                          const mv=properties.reduce((s,p)=>{
+                            const inc=INCOME_FIELDS.reduce((ss,f)=>ss+num(allData[p.id]?.[m]?.[f.key]),0);
+                            const exp=EXPENSE_FIELDS.reduce((ss,f)=>ss+num(allData[p.id]?.[m]?.[f.key]),0);
+                            return s+(inc-exp);
+                          },0);
+                          return <td key={m} style={{padding:"10px 12px",textAlign:"right",fontSize:12,fontWeight:700,color:mv>0?"#16a34a":mv<0?"#dc2626":"#cbd5e1"}}>{mv!==0?fmt(mv):"–"}</td>;
+                        })}
+                        <td style={{padding:"10px 12px",textAlign:"right",fontSize:13,fontWeight:700,color:totalIncome>0?"#16a34a":"#cbd5e1",borderLeft:"1px solid #e2e8f0"}}>{totalIncome>0?fmt(totalIncome):"–"}</td>
+                        <td style={{padding:"10px 12px",textAlign:"right",fontSize:13,fontWeight:700,color:totalExpenses>0?"#dc2626":"#cbd5e1"}}>{totalExpenses>0?fmt(totalExpenses):"–"}</td>
+                        <td style={{padding:"10px 12px",textAlign:"right",fontSize:13,fontWeight:700,color:totalNet>0?"#16a34a":totalNet<0?"#dc2626":"#cbd5e1"}}>{totalNet!==0?fmt(totalNet):"–"}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Tax Summary ───────────────────────────────────────────────────────────────
 function TaxReturnSummary({properties,allData}) {
   const propIds=properties.map(p=>p.id);
@@ -616,7 +721,7 @@ function Dashboard({currentUser, onLogout, clients, onClientsChange}) {
           {/* Right side */}
           <div style={{display:"flex",alignItems:"center",gap:12}}>
             <div style={{display:"flex",gap:2,background:"#f1f5f9",padding:3,borderRadius:10,border:"1px solid #e2e8f0"}}>
-              {[["properties","Properties"],["summary","Tax Summary"]].map(([tab,lbl])=>(
+              {[["properties","Properties"],["quarterly","Quarterly"],["summary","Tax Summary"]].map(([tab,lbl])=>(
                 <button key={tab} onClick={()=>setActiveTab(tab)}
                   style={{padding:"6px 16px",borderRadius:7,border:"none",cursor:"pointer",fontSize:12,fontWeight:600,transition:"all 0.2s",fontFamily:"'DM Sans',sans-serif",
                     background:activeTab===tab?"#1e293b":"transparent",color:activeTab===tab?"white":"#64748b"}}>
@@ -685,6 +790,8 @@ function Dashboard({currentUser, onLogout, clients, onClientsChange}) {
             </div>
           )}
         </div>
+      ):activeTab==="quarterly"?(
+        <QuarterlyReport properties={properties} allData={allData} taxYear={activeTaxYear}/>
       ):(
         <TaxReturnSummary properties={properties} allData={allData}/>
       )}
