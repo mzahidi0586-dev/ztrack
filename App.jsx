@@ -166,11 +166,14 @@ function LoginScreen({clients, onLogin}) {
 }
 
 // ─── Admin Panel ───────────────────────────────────────────────────────────────
-function AdminPanel({clients,onAddClient,onDeleteClient,onClose}) {
+function AdminPanel({clients,onAddClient,onDeleteClient,onResetPassword,onClose}) {
   const [name,setName]=useState("");
   const [username,setUsername]=useState("");
   const [password,setPassword]=useState("");
   const [msg,setMsg]=useState("");
+  const [resetId,setResetId]=useState(null);
+  const [newPass,setNewPass]=useState("");
+  const [resetMsg,setResetMsg]=useState("");
 
   const add = () => {
     if(!name.trim()||!username.trim()||!password.trim()){setMsg("All fields required.");return;}
@@ -217,17 +220,54 @@ function AdminPanel({clients,onAddClient,onDeleteClient,onClose}) {
           <div style={{textAlign:"center",padding:"30px 0",color:"#94a3b8",fontSize:13}}>No clients yet. Add one above.</div>
         ):(
           clients.map(c=>(
-            <div key={c.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",background:"#fff",borderRadius:10,border:"1px solid #e2e8f0",marginBottom:8}}>
-              <div>
-                <div style={{fontSize:14,fontWeight:600,color:"#0f172a"}}>{c.name}</div>
-                <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>@{c.username} · {(c.taxYears||[]).join(", ")}</div>
+            <div key={c.id} style={{marginBottom:8}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"12px 16px",background:"#fff",borderRadius:resetId===c.id?"10px 10px 0 0":10,border:"1px solid #e2e8f0",borderBottom:resetId===c.id?"none":"1px solid #e2e8f0"}}>
+                <div>
+                  <div style={{fontSize:14,fontWeight:600,color:"#0f172a"}}>{c.name}</div>
+                  <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>@{c.username} · {(c.taxYears||[]).join(", ")}</div>
+                </div>
+                <div style={{display:"flex",gap:8}}>
+                  <button onClick={()=>{setResetId(resetId===c.id?null:c.id);setNewPass("");setResetMsg("");}}
+                    style={{background:resetId===c.id?"#eff6ff":"#f8fafc",border:`1px solid ${resetId===c.id?"#bfdbfe":"#e2e8f0"}`,borderRadius:7,color:resetId===c.id?"#2563eb":"#475569",cursor:"pointer",fontSize:12,padding:"5px 12px",fontFamily:"'DM Sans',sans-serif",fontWeight:600}}>
+                    {resetId===c.id?"Cancel":"Reset Password"}
+                  </button>
+                  <button onClick={()=>onDeleteClient(c.id)}
+                    style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:7,color:"#ef4444",cursor:"pointer",fontSize:12,padding:"5px 12px",fontFamily:"'DM Sans',sans-serif"}}
+                    onMouseEnter={e=>{e.currentTarget.style.background="#ef4444";e.currentTarget.style.color="white";}}
+                    onMouseLeave={e=>{e.currentTarget.style.background="#fef2f2";e.currentTarget.style.color="#ef4444";}}>
+                    Delete
+                  </button>
+                </div>
               </div>
-              <button onClick={()=>onDeleteClient(c.id)}
-                style={{background:"#fef2f2",border:"1px solid #fecaca",borderRadius:7,color:"#ef4444",cursor:"pointer",fontSize:12,padding:"5px 12px",fontFamily:"'DM Sans',sans-serif"}}
-                onMouseEnter={e=>{e.currentTarget.style.background="#ef4444";e.currentTarget.style.color="white";}}
-                onMouseLeave={e=>{e.currentTarget.style.background="#fef2f2";e.currentTarget.style.color="#ef4444";}}>
-                Delete
-              </button>
+              {resetId===c.id&&(
+                <div style={{padding:"14px 16px",background:"#f8fafc",border:"1px solid #e2e8f0",borderTop:"1px solid #bfdbfe",borderRadius:"0 0 10px 10px",display:"flex",alignItems:"center",gap:10}}>
+                  <input
+                    type="password"
+                    value={newPass}
+                    onChange={e=>setNewPass(e.target.value)}
+                    placeholder="New password"
+                    style={{...inp,maxWidth:220,marginTop:0}}
+                    onKeyDown={e=>{
+                      if(e.key==="Enter"&&newPass.trim()){
+                        onResetPassword(c.id,newPass.trim());
+                        setResetMsg("Password updated ✓");
+                        setNewPass("");
+                        setTimeout(()=>{setResetMsg("");setResetId(null);},2000);
+                      }
+                    }}
+                  />
+                  <button onClick={()=>{
+                    if(!newPass.trim()){setResetMsg("Enter a new password.");return;}
+                    onResetPassword(c.id,newPass.trim());
+                    setResetMsg("Password updated ✓");
+                    setNewPass("");
+                    setTimeout(()=>{setResetMsg("");setResetId(null);},2000);
+                  }} style={{padding:"9px 18px",background:"#2563eb",border:"none",borderRadius:8,color:"white",cursor:"pointer",fontSize:13,fontWeight:600,fontFamily:"'DM Sans',sans-serif",whiteSpace:"nowrap"}}>
+                    Update Password
+                  </button>
+                  {resetMsg&&<span style={{fontSize:13,color:resetMsg.includes("✓")?"#16a34a":"#dc2626"}}>{resetMsg}</span>}
+                </div>
+              )}
             </div>
           ))
         )}
@@ -675,7 +715,7 @@ function Dashboard({currentUser, onLogout, clients, onClientsChange}) {
     <div style={{minHeight:"100vh",background:"#f8fafc",fontFamily:"'DM Sans',sans-serif"}}>
 
       {deleteTarget&&<DeleteModal title="Delete Property?" message={`Are you sure you want to delete <strong>"${properties.find(p=>p.id===deleteTarget)?.name||""}"</strong>? All data will be permanently removed.`} onConfirm={confirmDelete} onCancel={()=>setDeleteTarget(null)}/>}
-      {showAdminPanel&&<AdminPanel clients={clients} onAddClient={c=>onClientsChange([...clients,c])} onDeleteClient={id=>onClientsChange(clients.filter(c=>c.id!==id))} onClose={()=>setShowAdminPanel(false)}/>}
+      {showAdminPanel&&<AdminPanel clients={clients} onAddClient={c=>onClientsChange([...clients,c])} onDeleteClient={id=>onClientsChange(clients.filter(c=>c.id!==id))} onResetPassword={(id,pass)=>onClientsChange(clients.map(c=>c.id===id?{...c,password:pass}:c))} onClose={()=>setShowAdminPanel(false)}/>}
       {showAddModal&&<AddPropertyModal onAdd={addProperty} onClose={()=>setShowAdd(false)}/>}
 
       {/* Nav */}
