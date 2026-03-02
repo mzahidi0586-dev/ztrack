@@ -611,9 +611,11 @@ function CommonExpensesDetail({data, onChange, onBack}) {
 }
 
 // ─── Quarterly Report ─────────────────────────────────────────────────────────
-function QuarterlyReport({properties,allData,taxYear}) {
+function QuarterlyReport({properties,allData,commonData,taxYear}) {
   const propIds=properties.map(p=>p.id);
   const pQ=(id,key,months)=>quarterSum(allData[id]||{},key,months);
+  const cQ=(key,months)=>months.reduce((s,m)=>s+num(commonData?.[m]?.[key]),0);
+  const commonQTotal=(months)=>COMMON_EXPENSE_FIELDS.reduce((s,f)=>s+cQ(f.key,months),0);
   const calcQ=(id,months)=>{
     const rentalIncome=pQ(id,"rent",months),otherIncome=pQ(id,"otherIncome",months),totalRevenue=rentalIncome+otherIncome;
     const rriTotal=RRI_KEYS.reduce((s,k)=>s+pQ(id,k,months),0),repairsTotal=REPAIR_KEYS.reduce((s,k)=>s+pQ(id,k,months),0),legalTotal=LEGAL_KEYS.reduce((s,k)=>s+pQ(id,k,months),0);
@@ -648,6 +650,11 @@ function QuarterlyReport({properties,allData,taxYear}) {
     {label:"Net Property Income",isTotal:true,calcKey:"netIncome",hl:"net",bold:true},{type:"divider"},
     {label:"Add 100% of Mortgage Interest",indent:1,field:"mortgage",hl:"neutral"},
     {label:"Total Gross Income",isTotal:true,calcKey:"grossIncome",hl:"income",bold:true,doubleLine:true},
+    {type:"spacer"},{type:"section",label:"Common Expenses"},{type:"subheader",label:"Shared Landlord Costs"},
+    ...COMMON_EXPENSE_FIELDS.map(f=>({label:f.label,indent:1,type:"common",commonKey:f.key})),
+    {label:"Total Common Expenses",isTotal:true,type:"commonTotal",hl:"expense",bold:true},
+    {type:"divider"},
+    {label:"Net Income after Common Expenses",isTotal:true,type:"commonNet",hl:"net",bold:true,doubleLine:true},
   ];
 
   if(properties.length===0) return(
@@ -667,6 +674,7 @@ function QuarterlyReport({properties,allData,taxYear}) {
           const qCalc={};propIds.forEach(id=>{qCalc[id]=calcQ(id,q.months);});
           const grand=key=>propIds.reduce((s,id)=>s+(qCalc[id][key]||0),0);
           const grandF=field=>propIds.reduce((s,id)=>s+pQ(id,field,q.months),0);
+          const cqTotal=commonQTotal(q.months);
           const qRows=rows.map(r=>r.type==="noterow"?{...r,label:`Months: ${q.range}`}:r);
           return(
             <div key={q.label}>
@@ -691,6 +699,9 @@ function QuarterlyReport({properties,allData,taxYear}) {
                         if(row.type==="section") return <tr key={ri} style={{background:"#f1f5f9"}}><td colSpan={properties.length+2} style={{padding:"12px 18px 4px",fontFamily:"'DM Serif Display',serif",fontSize:14,color:"#475569"}}>{row.label}</td></tr>;
                         if(row.type==="subheader") return <tr key={ri} style={{background:"#f8fafc"}}><td colSpan={properties.length+2} style={{padding:"10px 18px 4px 22px",fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:1.4}}>{row.label}</td></tr>;
                         if(row.type==="noterow") return <tr key={ri} style={{background:"#fff"}}><td style={{padding:"6px 18px",fontSize:11,color:"#94a3b8",fontStyle:"italic"}}>{row.label}</td>{properties.map(p=><td key={p.id}/>)}<td/></tr>;
+                        if(row.type==="common"){const v=cQ(row.commonKey,q.months);return(<tr key={ri} style={{background:"#fff"}}><td style={{padding:"7px 18px 7px 54px",fontSize:12,color:"#475569",borderBottom:"1px solid #f1f5f9",position:"sticky",left:0,background:"#fff"}}>{row.label}</td>{properties.map(p=><td key={p.id} style={{borderBottom:"1px solid #f1f5f9"}}/>)}<td style={{padding:"7px 14px",textAlign:"right",fontSize:12,color:v===0?"#e2e8f0":"#7c3aed",borderBottom:"1px solid #f1f5f9",borderLeft:"2px solid #e2e8f0",whiteSpace:"nowrap"}}>{v!==0?fmt(v):""}</td></tr>);}
+                        if(row.type==="commonTotal"){return(<tr key={ri} style={{background:"#faf5ff"}}><td style={{padding:"10px 18px",fontSize:13,color:"#1e293b",fontWeight:700,borderBottom:"1px solid #f1f5f9",position:"sticky",left:0,background:"#faf5ff"}}>{row.label}</td>{properties.map(p=><td key={p.id} style={{borderBottom:"1px solid #f1f5f9",background:"#faf5ff"}}/>)}<td style={{padding:"10px 14px",textAlign:"right",fontSize:13,fontWeight:700,color:cqTotal===0?"#e2e8f0":"#7c3aed",borderBottom:"1px solid #f1f5f9",borderLeft:"2px solid #e2e8f0",background:cqTotal!==0?"#f3e8ff":"transparent",whiteSpace:"nowrap"}}>{cqTotal!==0?fmt(cqTotal):""}</td></tr>);}
+                        if(row.type==="commonNet"){const netAfter=grand("grossIncome")-cqTotal;return(<tr key={ri} style={{background:netAfter>=0?"#f0fdf4":"#fef2f2",borderTop:"3px double #cbd5e1"}}><td style={{padding:"10px 18px",fontSize:13,color:"#1e293b",fontWeight:700,borderBottom:"1px solid #f1f5f9",position:"sticky",left:0,background:netAfter>=0?"#f0fdf4":"#fef2f2"}}>{row.label}</td>{properties.map(p=><td key={p.id} style={{borderBottom:"1px solid #f1f5f9"}}/>)}<td style={{padding:"10px 14px",textAlign:"right",fontSize:14,fontWeight:700,color:netAfter>=0?"#16a34a":"#dc2626",borderBottom:"1px solid #f1f5f9",borderLeft:"2px solid #e2e8f0",whiteSpace:"nowrap"}}>{fmt(netAfter)}</td></tr>);}
                         const getVal=id=>row.calcKey?(qCalc[id][row.calcKey]||0):pQ(id,row.field,q.months);
                         const grandVal=row.calcKey?grand(row.calcKey):grandF(row.field);
                         const isTotal=row.isTotal,rowBg=isTotal?"#f8fafc":"#fff",bt=row.doubleLine?"3px double #cbd5e1":undefined;
@@ -715,9 +726,11 @@ function QuarterlyReport({properties,allData,taxYear}) {
 }
 
 // ─── Tax Summary ───────────────────────────────────────────────────────────────
-function TaxReturnSummary({properties,allData}) {
+function TaxReturnSummary({properties,allData,commonData}) {
   const propIds=properties.map(p=>p.id);
   const pA=(id,key)=>annualSum(allData[id]||{},key);
+  const cA=(key)=>MONTHS.reduce((s,m)=>s+num(commonData?.[m]?.[key]),0);
+  const commonAnnTotal=COMMON_EXPENSE_FIELDS.reduce((s,f)=>s+cA(f.key),0);
   const calc=id=>{
     const rentalIncome=pA(id,"rent"),otherIncome=pA(id,"otherIncome"),totalRevenue=rentalIncome+otherIncome;
     const rriTotal=RRI_KEYS.reduce((s,k)=>s+pA(id,k),0),repairsTotal=REPAIR_KEYS.reduce((s,k)=>s+pA(id,k),0),legalTotal=LEGAL_KEYS.reduce((s,k)=>s+pA(id,k),0);
@@ -756,6 +769,11 @@ function TaxReturnSummary({properties,allData}) {
     {label:"Net Property Income",isTotal:true,calcKey:"netIncome",hl:"net",bold:true},{type:"divider"},
     {label:"Add 100% of Mortgage Interest",indent:1,field:"mortgage",hl:"neutral"},
     {label:"Total Gross Income",isTotal:true,calcKey:"grossIncome",hl:"income",bold:true,doubleLine:true},
+    {type:"spacer"},{type:"section",label:"Common Expenses"},{type:"subheader",label:"Shared Landlord Costs"},
+    ...COMMON_EXPENSE_FIELDS.map(f=>({label:f.label,indent:1,type:"common",commonKey:f.key})),
+    {label:"Total Common Expenses",isTotal:true,type:"commonTotal",hl:"expense",bold:true},
+    {type:"divider"},
+    {label:"Net Income after Common Expenses",isTotal:true,type:"commonNet",hl:"net",bold:true,doubleLine:true},
   ];
 
   return (
@@ -781,6 +799,9 @@ function TaxReturnSummary({properties,allData}) {
                 if(row.type==="section") return <tr key={ri} style={{background:"#f1f5f9"}}><td colSpan={properties.length+2} style={{padding:"12px 18px 4px",fontFamily:"'DM Serif Display',serif",fontSize:14,color:"#475569"}}>{row.label}</td></tr>;
                 if(row.type==="subheader") return <tr key={ri} style={{background:"#f8fafc"}}><td colSpan={properties.length+2} style={{padding:"10px 18px 4px 22px",fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:1.4}}>{row.label}</td></tr>;
                 if(row.type==="noterow") return <tr key={ri} style={{background:"#fff"}}><td style={{padding:"6px 18px",fontSize:11,color:"#94a3b8",fontStyle:"italic"}}>{row.label}</td>{properties.map(p=><td key={p.id}/>)}<td/></tr>;
+                if(row.type==="common"){const v=cA(row.commonKey);return(<tr key={ri} style={{background:"#fff"}}><td style={{padding:"7px 18px 7px 54px",fontSize:12,color:"#475569",borderBottom:"1px solid #f1f5f9",position:"sticky",left:0,background:"#fff"}}>{row.label}</td>{properties.map(p=><td key={p.id} style={{borderBottom:"1px solid #f1f5f9"}}/>)}<td style={{padding:"7px 14px",textAlign:"right",fontSize:12,color:v===0?"#e2e8f0":"#7c3aed",borderBottom:"1px solid #f1f5f9",borderLeft:"2px solid #e2e8f0",whiteSpace:"nowrap"}}>{v!==0?fmt(v):""}</td></tr>);}
+                if(row.type==="commonTotal"){return(<tr key={ri} style={{background:"#faf5ff"}}><td style={{padding:"10px 18px",fontSize:13,color:"#1e293b",fontWeight:700,borderBottom:"1px solid #f1f5f9",position:"sticky",left:0,background:"#faf5ff"}}>{row.label}</td>{properties.map(p=><td key={p.id} style={{borderBottom:"1px solid #f1f5f9",background:"#faf5ff"}}/>)}<td style={{padding:"10px 14px",textAlign:"right",fontSize:13,fontWeight:700,color:commonAnnTotal===0?"#e2e8f0":"#7c3aed",borderBottom:"1px solid #f1f5f9",borderLeft:"2px solid #e2e8f0",background:commonAnnTotal!==0?"#f3e8ff":"transparent",whiteSpace:"nowrap"}}>{commonAnnTotal!==0?fmt(commonAnnTotal):""}</td></tr>);}
+                if(row.type==="commonNet"){const netAfter=grand("grossIncome")-commonAnnTotal;return(<tr key={ri} style={{background:netAfter>=0?"#f0fdf4":"#fef2f2",borderTop:"3px double #cbd5e1"}}><td style={{padding:"10px 18px",fontSize:13,color:"#1e293b",fontWeight:700,borderBottom:"1px solid #f1f5f9",position:"sticky",left:0,background:netAfter>=0?"#f0fdf4":"#fef2f2"}}>{row.label}</td>{properties.map(p=><td key={p.id} style={{borderBottom:"1px solid #f1f5f9"}}/>)}<td style={{padding:"10px 14px",textAlign:"right",fontSize:14,fontWeight:700,color:netAfter>=0?"#16a34a":"#dc2626",borderBottom:"1px solid #f1f5f9",borderLeft:"2px solid #e2e8f0",whiteSpace:"nowrap"}}>{fmt(netAfter)}</td></tr>);}
                 const getVal=id=>row.calcKey?(allCalc[id][row.calcKey]||0):pA(id,row.field);
                 const grandVal=row.calcKey?grand(row.calcKey):grandF(row.field);
                 const isTotal=row.isTotal,rowBg=isTotal?"#f8fafc":"#fff",bt=row.doubleLine?"3px double #cbd5e1":undefined;
@@ -1029,9 +1050,9 @@ function Dashboard({currentUser, onLogout, clients, onClientsChange}) {
           )}
         </div>
       ):activeTab==="quarterly"?(
-        <QuarterlyReport properties={properties} allData={allData} taxYear={activeTaxYear}/>
+        <QuarterlyReport properties={properties} allData={allData} commonData={commonData} taxYear={activeTaxYear}/>
       ):(
-        <TaxReturnSummary properties={properties} allData={allData}/>
+        <TaxReturnSummary properties={properties} allData={allData} commonData={commonData}/>
       )}
     </div>
   );
