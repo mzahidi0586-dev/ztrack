@@ -1,70 +1,122 @@
-# GitHub Codespaces ♥️ React
+# ZTrack – Property Income & Tax Return Tracker
 
-Welcome to your shiny new Codespace running React! We've got everything fired up and running for you to explore React.
+A web app for tracking rental property income and expenses across multiple clients and tax years, aligned to HMRC SA105.
 
-You've got a blank canvas to work on from a git perspective as well. There's a single initial commit with the what you're seeing right now - where you go from here is up to you!
+---
 
-Everything you do here is contained within this one codespace. There is no repository on GitHub yet. If and when you’re ready you can click "Publish Branch" and we’ll create your repository and push up your project. If you were just exploring then and have no further need for this code then you can simply delete your codespace and it's gone forever.
+## Features
 
-This project was bootstrapped for you with [Vite](https://vitejs.dev/).
+- **Multi-client login** — Admin creates client accounts; each client sees only their own data
+- **Tax year switching** — Separate data per tax year (2021/22 – 2025/26), addable per client
+- **Tax Return Summary** — Full HMRC SA105-aligned breakdown per property
+- **Property management** — Add/delete properties with monthly income & expense entry
+- **Light theme** — Clean, professional UI with DM Serif Display + DM Sans fonts
 
-## Available Scripts
+---
 
-In the project directory, you can run:
+## Getting Started
 
-### `npm start`
+### 1. Install dependencies
 
-We've already run this for you in the `Codespaces: server` terminal window below. If you need to stop the server for any reason you can just run `npm start` again to bring it back online.
+```bash
+npm install
+```
 
-Runs the app in the development mode.\
-Open [http://localhost:3000/](http://localhost:3000/) in the built-in Simple Browser (`Cmd/Ctrl + Shift + P > Simple Browser: Show`) to view your running application.
+### 2. Run locally
 
-The page will reload automatically when you make changes.\
-You may also see any lint errors in the console.
+```bash
+npm run dev
+```
 
-### `npm test`
+Open [http://localhost:5173](http://localhost:5173)
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### 3. Build for production
 
-### `npm run build`
+```bash
+npm run build
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Output goes to `dist/` — deploy to GitHub Pages, Netlify, Vercel, etc.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+---
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Default Login
 
-## Learn More
+| Role  | Username | Password   |
+|-------|----------|------------|
+| Admin | `admin`  | `admin123` |
 
-You can learn more in the [Vite documentation](https://vitejs.dev/guide/).
+> ⚠️ **Change the admin password** before deploying. Open `src/App.jsx` and update:
+> ```js
+> const ADMIN_PASSWORD = "admin123";
+> ```
 
-To learn Vitest, a Vite-native testing framework, go to [Vitest documentation](https://vitest.dev/guide/)
+---
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## Adding Clients
 
-### Code Splitting
+1. Log in as admin
+2. Click **⚙️ Clients** in the top nav
+3. Enter the client's name, username, and password
+4. Clients can then log in and see only their own properties
 
-This section has moved here: [https://sambitsahoo.com/blog/vite-code-splitting-that-works.html](https://sambitsahoo.com/blog/vite-code-splitting-that-works.html)
+---
 
-### Analyzing the Bundle Size
+## Deploying to GitHub Pages
 
-This section has moved here: [https://github.com/btd/rollup-plugin-visualizer#rollup-plugin-visualizer](https://github.com/btd/rollup-plugin-visualizer#rollup-plugin-visualizer)
+1. Install the GitHub Pages plugin:
+   ```bash
+   npm install --save-dev gh-pages
+   ```
 
-### Making a Progressive Web App
+2. Add to `package.json` scripts:
+   ```json
+   "homepage": "https://yourusername.github.io/ztrack",
+   "predeploy": "npm run build",
+   "deploy": "gh-pages -d dist"
+   ```
 
-This section has moved here: [https://dev.to/hamdankhan364/simplifying-progressive-web-app-pwa-development-with-vite-a-beginners-guide-38cf](https://dev.to/hamdankhan364/simplifying-progressive-web-app-pwa-development-with-vite-a-beginners-guide-38cf)
+3. Add base path to `vite.config.js`:
+   ```js
+   base: "/ztrack/",
+   ```
 
-### Advanced Configuration
+4. Deploy:
+   ```bash
+   npm run deploy
+   ```
 
-This section has moved here: [https://vitejs.dev/guide/build.html#advanced-base-options](https://vitejs.dev/guide/build.html#advanced-base-options)
+---
 
-### Deployment
+## Data Storage
 
-This section has moved here: [https://vitejs.dev/guide/build.html](https://vitejs.dev/guide/build.html)
+All data is stored in the browser's `localStorage`. This means:
+- Data persists between sessions on the same browser/device
+- Data is **not** synced across devices
+- For multi-device use, consider integrating a backend (Firebase, Supabase, etc.)
 
-### Troubleshooting
+---
 
-This section has moved here: [https://vitejs.dev/guide/troubleshooting.html](https://vitejs.dev/guide/troubleshooting.html)
+## Project Structure
+
+```
+ztrack/
+├── public/
+│   └── logo.png          # ZW logo
+├── src/
+│   ├── App.jsx           # Main application (all components)
+│   ├── main.jsx          # React entry point
+│   └── index.css         # Global styles
+├── index.html
+├── package.json
+├── vite.config.js
+└── README.md
+```
+
+---
+
+## Tech Stack
+
+- [React 18](https://react.dev/)
+- [Vite 5](https://vitejs.dev/)
+- Google Fonts: DM Serif Display + DM Sans

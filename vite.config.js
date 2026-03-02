@@ -1,11 +1,8 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-// https://vitejs.dev/config/
 export default defineConfig({
+  base: "/ztrack/",
   plugins: [react()],
-  test: {
-    globals: true,
-    environment: 'jsdom',
-  },
-})
+  assetsInclude: ["**/*.png", "**/*.jpg", "**/*.svg"],
+});
