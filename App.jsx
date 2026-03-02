@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import LOGO_SRC from "./logo.png";
+import { db } from "./firebase.js";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 const MONTHS = ["Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar"];
@@ -512,18 +514,18 @@ function Dashboard({currentUser, onLogout, clients, onClientsChange}) {
     setLoaded(false);
     (async()=>{
       try{
-        const sp=localStorage.getItem(propsKey);
-        const sd=localStorage.getItem(dataKey);
-        setProperties(sp?JSON.parse(sp):[]);
-        setAllData(sd?JSON.parse(sd):{});
+        const sp = await getDoc(doc(db, "ztStore", propsKey));
+        const sd = await getDoc(doc(db, "ztStore", dataKey));
+        setProperties(sp.exists() ? sp.data().value : []);
+        setAllData(sd.exists() ? sd.data().value : {});
       } catch(e){ setProperties([]); setAllData({}); }
       setLoaded(true);
     })();
   },[propsKey,dataKey]);
 
   // Save on change
-  useEffect(()=>{ if(loaded&&propsKey) localStorage.setItem(propsKey, JSON.stringify(properties)); },[properties,loaded]);
-  useEffect(()=>{ if(loaded&&dataKey)  localStorage.setItem(dataKey, JSON.stringify(allData)); },[allData,loaded]);
+  useEffect(()=>{ if(loaded&&propsKey) setDoc(doc(db,"ztStore",propsKey),{value:properties}); },[properties,loaded]);
+  useEffect(()=>{ if(loaded&&dataKey)  setDoc(doc(db,"ztStore",dataKey),{value:allData}); },[allData,loaded]);
 
   const addProperty=prop=>{const id="p"+Date.now();setProperties(prev=>[...prev,{...prop,id}]);setAllData(prev=>({...prev,[id]:makeEmptyData()}));};
   const confirmDelete=()=>{const id=deleteTarget;setProperties(prev=>prev.filter(p=>p.id!==id));setAllData(prev=>{const d={...prev};delete d[id];return d;});setDeleteTarget(null);};
@@ -703,21 +705,21 @@ export default function App() {
     return()=>document.head.removeChild(s);
   },[]);
 
-  // Load clients list from shared storage
+  // Load clients list from Firestore
   useEffect(()=>{
     (async()=>{
       try{
-        const sc=localStorage.getItem("zt-clients-v1");
-        if(sc) setClients(JSON.parse(sc));
+        const snap = await getDoc(doc(db, "ztStore", "zt-clients-v1"));
+        if(snap.exists()) setClients(snap.data().value || []);
       } catch(e){}
       setClientsLoaded(true);
     })();
   },[]);
 
-  // Save clients
+  // Save clients to Firestore
   const updateClients = (newClients) => {
     setClients(newClients);
-    localStorage.setItem("zt-clients-v1", JSON.stringify(newClients));
+    setDoc(doc(db, "ztStore", "zt-clients-v1"), { value: newClients });
   };
 
   if(!clientsLoaded) return <div style={{minHeight:"100vh",background:"#f8fafc",display:"flex",alignItems:"center",justifyContent:"center",fontFamily:"'DM Sans',sans-serif",color:"#94a3b8"}}>Loading...</div>;
