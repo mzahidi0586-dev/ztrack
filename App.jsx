@@ -402,6 +402,44 @@ function PropertyDetail({property,data,onChange,onBack}) {
 
 // ─── Quarterly Report ─────────────────────────────────────────────────────────
 function QuarterlyReport({properties,allData,taxYear}) {
+  const propIds=properties.map(p=>p.id);
+  const pQ=(id,key,months)=>quarterSum(allData[id]||{},key,months);
+  const calcQ=(id,months)=>{
+    const rentalIncome=pQ(id,"rent",months),otherIncome=pQ(id,"otherIncome",months),totalRevenue=rentalIncome+otherIncome;
+    const rriTotal=RRI_KEYS.reduce((s,k)=>s+pQ(id,k,months),0),repairsTotal=REPAIR_KEYS.reduce((s,k)=>s+pQ(id,k,months),0),legalTotal=LEGAL_KEYS.reduce((s,k)=>s+pQ(id,k,months),0);
+    const mortgage=pQ(id,"mortgage",months),otherFinance=pQ(id,"otherFinance",months),financeTotal=mortgage+otherFinance;
+    const totalExpenses=rriTotal+repairsTotal+legalTotal+financeTotal,netIncome=totalRevenue-totalExpenses,grossIncome=netIncome+mortgage;
+    return {rentalIncome,otherIncome,totalRevenue,rriTotal,repairsTotal,legalTotal,financeTotal,mortgage,otherFinance,totalExpenses,netIncome,grossIncome};
+  };
+  const hlColor=(hl,val)=>hl==="income"?"#16a34a":hl==="expense"?"#dc2626":hl==="net"?(val>=0?"#16a34a":"#dc2626"):"#475569";
+  const hlBg=(hl,val)=>hl==="income"?"#f0fdf4":hl==="expense"?"#fef2f2":hl==="net"?(val>=0?"#f0fdf4":"#fef2f2"):"transparent";
+  const rows=[
+    {type:"section",label:"Income"},{type:"noterow",label:"Months"},
+    {label:"Rental Income",indent:1,field:"rent"},{label:"Other Income – Parking",indent:1,field:"otherIncome"},
+    {label:"Total Revenue",isTotal:true,calcKey:"totalRevenue",hl:"income",bold:true},{type:"spacer"},
+    {type:"section",label:"Expenses"},{type:"subheader",label:"Rent, Rates & Insurance"},
+    {label:"Service Charges",indent:1,field:"serviceCharges"},{label:"Rates (including when empty)",indent:1,field:"councilTax"},
+    {label:"Water Rates",indent:1,field:"water"},{label:"Gas",indent:1,field:"gas"},{label:"Electricity",indent:1,field:"electricity"},
+    {label:"Landlord & Building Insurance",indent:1,field:"insurance"},{label:"Content Insurance & Deposit Protection",indent:1,field:"contentsIns"},
+    {label:"TV, Tel / Broadband",indent:1,field:"broadband"},{label:"TV Licence / Adverts",indent:1,field:"tvLicence"},{label:"Ground Rent",indent:1,field:"groundRent"},
+    {label:"(Rent, Rates & Insurance)",isTotal:true,calcKey:"rriTotal",hl:"expense",italic:true},{type:"spacer"},
+    {type:"subheader",label:"Repairs & Renewals"},
+    {label:"Repairs",indent:1,field:"repairs"},{label:"Gas Certificate",indent:1,field:"gasCert"},{label:"Electricity Certificate",indent:1,field:"electricCert"},
+    {label:"Replacement Furniture",indent:1,field:"replacement"},{label:"End of Tenancy Cleaning",indent:1,field:"cleaning"},
+    {label:"Repairs & Renewals",isTotal:true,calcKey:"repairsTotal",hl:"expense",italic:true},{type:"spacer"},
+    {type:"subheader",label:"Legal, Management"},
+    {label:"Agents Commission",indent:1,field:"agentCommission"},{label:"Accountancy Fee",indent:1,field:"accountancy"},
+    {label:"Other Expenses",indent:1,field:"otherExpenses"},{label:"Legal Expenses",indent:1,field:"legalExpenses"},
+    {label:"Cost of Service Provided",isTotal:true,calcKey:"legalTotal",hl:"expense",italic:true},{type:"spacer"},
+    {type:"subheader",label:"Finance Charges"},
+    {label:"Mortgage Interest",indent:1,field:"mortgage"},{label:"Other Finance Charges",indent:1,field:"otherFinance"},
+    {label:"Mortgage Interest",isTotal:true,calcKey:"financeTotal",hl:"expense",italic:true},
+    {type:"divider"},{label:"Total Expenses",isTotal:true,calcKey:"totalExpenses",hl:"expense",bold:true},
+    {label:"Net Property Income",isTotal:true,calcKey:"netIncome",hl:"net",bold:true},{type:"divider"},
+    {label:"Add 100% of Mortgage Interest",indent:1,field:"mortgage",hl:"neutral"},
+    {label:"Total Gross Income",isTotal:true,calcKey:"grossIncome",hl:"income",bold:true,doubleLine:true},
+  ];
+
   if(properties.length===0) return(
     <div style={{padding:"80px 0",textAlign:"center",color:"#94a3b8",fontFamily:"'DM Sans',sans-serif"}}>
       <div style={{fontSize:48,marginBottom:14}}>📊</div>
@@ -412,78 +450,51 @@ function QuarterlyReport({properties,allData,taxYear}) {
     <div style={{padding:"28px 32px",fontFamily:"'DM Sans',sans-serif"}}>
       <div style={{marginBottom:22}}>
         <h2 style={{margin:0,fontFamily:"'DM Serif Display',serif",color:"#0f172a",fontSize:26}}>Quarterly Report</h2>
-        <p style={{margin:"5px 0 0",color:"#64748b",fontSize:13}}>Income & expenses by quarter · {taxYear}</p>
+        <p style={{margin:"5px 0 0",color:"#64748b",fontSize:13}}>Property income statement by quarter · {taxYear}</p>
       </div>
-      <div style={{display:"flex",flexDirection:"column",gap:24}}>
+      <div style={{display:"flex",flexDirection:"column",gap:32}}>
         {QUARTERS.map(q=>{
-          const rows=properties.map(p=>{
-            const t=quarterTotals(allData[p.id]||{},q.months);
-            return{...p,...t};
-          });
-          const totalIncome=rows.reduce((s,r)=>s+r.income,0);
-          const totalExpenses=rows.reduce((s,r)=>s+r.expenses,0);
-          const totalNet=rows.reduce((s,r)=>s+r.net,0);
+          const qCalc={};propIds.forEach(id=>{qCalc[id]=calcQ(id,q.months);});
+          const grand=key=>propIds.reduce((s,id)=>s+(qCalc[id][key]||0),0);
+          const grandF=field=>propIds.reduce((s,id)=>s+pQ(id,field,q.months),0);
+          const qRows=rows.map(r=>r.type==="noterow"?{...r,label:`Months: ${q.range}`}:r);
           return(
-            <div key={q.label} style={{borderRadius:14,border:"1px solid #e2e8f0",overflow:"hidden",boxShadow:"0 1px 6px rgba(0,0,0,0.06)"}}>
-              <div style={{background:"#f8fafc",padding:"14px 20px",borderBottom:"1px solid #e2e8f0",display:"flex",alignItems:"center",gap:14}}>
-                <div style={{background:"#1e293b",color:"white",fontWeight:700,fontSize:13,padding:"4px 12px",borderRadius:7}}>{q.label}</div>
-                <div style={{fontSize:14,fontWeight:600,color:"#0f172a"}}>{q.range}</div>
-                <div style={{marginLeft:"auto",display:"flex",gap:10}}>
-                  {[{l:"Income",v:totalIncome,c:"#16a34a",bg:"#f0fdf4"},{l:"Expenses",v:totalExpenses,c:"#dc2626",bg:"#fef2f2"},{l:"Net",v:totalNet,c:totalNet>=0?"#16a34a":"#dc2626",bg:totalNet>=0?"#f0fdf4":"#fef2f2"}].map((s,i)=>(
-                    <div key={i} style={{background:s.bg,padding:"4px 12px",borderRadius:7,display:"flex",gap:6,alignItems:"center"}}>
-                      <span style={{fontSize:10,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.8,fontWeight:600}}>{s.l}</span>
-                      <span style={{fontSize:13,fontWeight:700,color:s.c}}>{s.v!==0?fmt(s.v):"–"}</span>
-                    </div>
-                  ))}
-                </div>
+            <div key={q.label}>
+              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
+                <div style={{background:"#1e293b",color:"white",fontWeight:700,fontSize:13,padding:"5px 14px",borderRadius:8}}>{q.label}</div>
+                <span style={{fontFamily:"'DM Serif Display',serif",fontSize:18,color:"#0f172a"}}>{q.range}</span>
               </div>
-              <div style={{overflowX:"auto"}}>
-                <table style={{width:"100%",borderCollapse:"collapse",minWidth:500}}>
-                  <thead>
-                    <tr style={{background:"#f8fafc"}}>
-                      <th style={{padding:"10px 18px",textAlign:"left",color:"#475569",fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1.2,borderBottom:"1px solid #e2e8f0"}}>Property</th>
-                      {q.months.map(m=><th key={m} style={{padding:"10px 12px",textAlign:"right",color:"#475569",fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1.2,borderBottom:"1px solid #e2e8f0"}}>{m}</th>)}
-                      <th style={{padding:"10px 12px",textAlign:"right",color:"#16a34a",fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1.2,borderBottom:"1px solid #e2e8f0",borderLeft:"1px solid #e2e8f0"}}>Income</th>
-                      <th style={{padding:"10px 12px",textAlign:"right",color:"#dc2626",fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1.2,borderBottom:"1px solid #e2e8f0"}}>Expenses</th>
-                      <th style={{padding:"10px 12px",textAlign:"right",color:"#7c3aed",fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1.2,borderBottom:"1px solid #e2e8f0"}}>Net</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rows.map((r,i)=>{
-                      const monthNets=q.months.map(m=>({
-                        m,
-                        v:INCOME_FIELDS.reduce((s,f)=>s+num(allData[r.id]?.[m]?.[f.key]),0)-EXPENSE_FIELDS.reduce((s,f)=>s+num(allData[r.id]?.[m]?.[f.key]),0)
-                      }));
-                      return(
-                        <tr key={r.id} style={{borderBottom:"1px solid #f1f5f9",background:i%2===0?"#fff":"#fafbfc"}}>
-                          <td style={{padding:"9px 18px",fontSize:13,color:r.color,fontWeight:600}}>{r.name}</td>
-                          {monthNets.map(({m,v})=>(
-                            <td key={m} style={{padding:"9px 12px",textAlign:"right",fontSize:12,color:v>0?"#16a34a":v<0?"#dc2626":"#cbd5e1",fontWeight:v!==0?600:400}}>{v!==0?fmt(v):"–"}</td>
-                          ))}
-                          <td style={{padding:"9px 12px",textAlign:"right",fontSize:13,fontWeight:700,color:r.income>0?"#16a34a":"#cbd5e1",borderLeft:"1px solid #e2e8f0"}}>{r.income>0?fmt(r.income):"–"}</td>
-                          <td style={{padding:"9px 12px",textAlign:"right",fontSize:13,fontWeight:700,color:r.expenses>0?"#dc2626":"#cbd5e1"}}>{r.expenses>0?fmt(r.expenses):"–"}</td>
-                          <td style={{padding:"9px 12px",textAlign:"right",fontSize:13,fontWeight:700,color:r.net>0?"#16a34a":r.net<0?"#dc2626":"#cbd5e1"}}>{r.net!==0?fmt(r.net):"–"}</td>
-                        </tr>
-                      );
-                    })}
-                    {properties.length>1&&(
-                      <tr style={{background:"#f8fafc",borderTop:"2px solid #e2e8f0"}}>
-                        <td style={{padding:"10px 18px",fontSize:13,fontWeight:700,color:"#1e293b"}}>Total</td>
-                        {q.months.map(m=>{
-                          const mv=properties.reduce((s,p)=>{
-                            const inc=INCOME_FIELDS.reduce((ss,f)=>ss+num(allData[p.id]?.[m]?.[f.key]),0);
-                            const exp=EXPENSE_FIELDS.reduce((ss,f)=>ss+num(allData[p.id]?.[m]?.[f.key]),0);
-                            return s+(inc-exp);
-                          },0);
-                          return <td key={m} style={{padding:"10px 12px",textAlign:"right",fontSize:12,fontWeight:700,color:mv>0?"#16a34a":mv<0?"#dc2626":"#cbd5e1"}}>{mv!==0?fmt(mv):"–"}</td>;
-                        })}
-                        <td style={{padding:"10px 12px",textAlign:"right",fontSize:13,fontWeight:700,color:totalIncome>0?"#16a34a":"#cbd5e1",borderLeft:"1px solid #e2e8f0"}}>{totalIncome>0?fmt(totalIncome):"–"}</td>
-                        <td style={{padding:"10px 12px",textAlign:"right",fontSize:13,fontWeight:700,color:totalExpenses>0?"#dc2626":"#cbd5e1"}}>{totalExpenses>0?fmt(totalExpenses):"–"}</td>
-                        <td style={{padding:"10px 12px",textAlign:"right",fontSize:13,fontWeight:700,color:totalNet>0?"#16a34a":totalNet<0?"#dc2626":"#cbd5e1"}}>{totalNet!==0?fmt(totalNet):"–"}</td>
+              <div style={{borderRadius:14,border:"1px solid #e2e8f0",overflow:"hidden",boxShadow:"0 1px 6px rgba(0,0,0,0.06)"}}>
+                <div style={{overflowX:"auto"}}>
+                  <table style={{width:"100%",borderCollapse:"collapse",minWidth:700}}>
+                    <thead>
+                      <tr style={{background:"#f8fafc"}}>
+                        <th style={{padding:"13px 18px",textAlign:"left",color:"#475569",fontSize:11,fontWeight:700,textTransform:"uppercase",letterSpacing:1.2,borderBottom:"2px solid #e2e8f0",minWidth:280,position:"sticky",left:0,background:"#f8fafc"}}>Item</th>
+                        {properties.map(p=><th key={p.id} style={{padding:"13px 14px",textAlign:"right",color:p.color,fontSize:12,fontWeight:700,borderBottom:"2px solid #e2e8f0",minWidth:130,whiteSpace:"nowrap"}}>{p.name}</th>)}
+                        <th style={{padding:"13px 14px",textAlign:"right",color:"#7c3aed",fontSize:12,fontWeight:700,borderBottom:"2px solid #e2e8f0",minWidth:130,borderLeft:"2px solid #e2e8f0"}}>TOTAL</th>
                       </tr>
-                    )}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {qRows.map((row,ri)=>{
+                        if(row.type==="divider") return <tr key={ri}><td colSpan={properties.length+2} style={{padding:0,borderTop:"2px solid #e2e8f0",background:"#f8fafc"}}/></tr>;
+                        if(row.type==="spacer")  return <tr key={ri}><td colSpan={properties.length+2} style={{height:4,background:"#f8fafc"}}/></tr>;
+                        if(row.type==="section") return <tr key={ri} style={{background:"#f1f5f9"}}><td colSpan={properties.length+2} style={{padding:"12px 18px 4px",fontFamily:"'DM Serif Display',serif",fontSize:14,color:"#475569"}}>{row.label}</td></tr>;
+                        if(row.type==="subheader") return <tr key={ri} style={{background:"#f8fafc"}}><td colSpan={properties.length+2} style={{padding:"10px 18px 4px 22px",fontSize:10,color:"#94a3b8",fontWeight:700,textTransform:"uppercase",letterSpacing:1.4}}>{row.label}</td></tr>;
+                        if(row.type==="noterow") return <tr key={ri} style={{background:"#fff"}}><td style={{padding:"6px 18px",fontSize:11,color:"#94a3b8",fontStyle:"italic"}}>{row.label}</td>{properties.map(p=><td key={p.id}/>)}<td/></tr>;
+                        const getVal=id=>row.calcKey?(qCalc[id][row.calcKey]||0):pQ(id,row.field,q.months);
+                        const grandVal=row.calcKey?grand(row.calcKey):grandF(row.field);
+                        const isTotal=row.isTotal,rowBg=isTotal?"#f8fafc":"#fff",bt=row.doubleLine?"3px double #cbd5e1":undefined;
+                        return(
+                          <tr key={ri} style={{background:rowBg,borderTop:bt}}>
+                            <td style={{padding:`${isTotal?10:7}px 18px ${isTotal?10:7}px ${18+(row.indent||0)*18}px`,fontSize:isTotal?13:12,color:isTotal?"#1e293b":"#475569",fontWeight:row.bold?700:(isTotal?600:400),borderBottom:"1px solid #f1f5f9",fontStyle:row.italic?"italic":"normal",position:"sticky",left:0,background:rowBg}}>{row.label}</td>
+                            {properties.map(p=>{const v=getVal(p.id);return<td key={p.id} style={{padding:`${isTotal?10:7}px 14px`,textAlign:"right",fontSize:isTotal?13:12,fontWeight:row.bold?700:(isTotal?600:400),color:v===0?"#e2e8f0":hlColor(row.hl,v),borderBottom:"1px solid #f1f5f9",background:isTotal&&v!==0?hlBg(row.hl,v)+"40":"transparent",whiteSpace:"nowrap"}}>{v!==0?fmt(v):""}</td>;})}
+                            <td style={{padding:`${isTotal?10:7}px 14px`,textAlign:"right",fontSize:isTotal?13:12,fontWeight:row.bold?700:(isTotal?600:400),color:grandVal===0?"#e2e8f0":hlColor(row.hl,grandVal),borderBottom:"1px solid #f1f5f9",borderLeft:"2px solid #e2e8f0",background:isTotal&&grandVal!==0?hlBg(row.hl,grandVal):"transparent",whiteSpace:"nowrap"}}>{grandVal!==0?fmt(grandVal):""}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           );
