@@ -48,12 +48,29 @@ const RRI_KEYS    = ["serviceCharges","councilTax","water","gas","electricity","
 const REPAIR_KEYS = ["repairs","gasCert","electricCert","replacement","cleaning"];
 const LEGAL_KEYS  = ["agentCommission","accountancy","otherExpenses","legalExpenses"];
 
+// ─── Common Expenses ───────────────────────────────────────────────────────────
+const COMMON_EXPENSE_FIELDS = [
+  { key: "useOfHome",       label: "Use of Home (Landlord)" },
+  { key: "travelExpenses",  label: "Travel Expenses" },
+  { key: "phoneBusiness",   label: "Business Phone / Internet" },
+  { key: "officeSupplies",  label: "Office Supplies / Stationery" },
+  { key: "commonOther",     label: "Other Common Expenses" },
+];
+
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 function makeEmptyData() {
   const d = {};
   MONTHS.forEach(m => { d[m] = {}; ALL_FIELDS.forEach(f => { d[m][f.key] = ""; }); });
   return d;
 }
+function makeEmptyCommonData() {
+  const d = {};
+  MONTHS.forEach(m => { d[m] = {}; COMMON_EXPENSE_FIELDS.forEach(f => { d[m][f.key] = ""; }); });
+  return d;
+}
+function commonAnnualSum(data, key) { return MONTHS.reduce((s,m) => s + num(data?.[m]?.[key]), 0); }
+function commonMonthTotal(data, m) { return COMMON_EXPENSE_FIELDS.reduce((s,f) => s + num(data?.[m]?.[f.key]), 0); }
+function commonAnnualTotal(data) { return MONTHS.reduce((s,m) => s + commonMonthTotal(data, m), 0); }
 function fmt(val) {
   if (val===""||val===null||val===undefined) return "–";
   const n = parseFloat(val);
@@ -440,6 +457,159 @@ function PropertyDetail({property,data,onChange,onBack}) {
   );
 }
 
+// ─── Common Expenses Card ──────────────────────────────────────────────────────
+function CommonExpensesCard({data, onSelect}) {
+  const total = commonAnnualTotal(data);
+  return (
+    <div
+      onClick={onSelect}
+      style={{background:"#fff",border:"1px solid #e2e8f0",borderRadius:16,padding:"20px 22px",position:"relative",boxShadow:"0 1px 4px rgba(0,0,0,0.06)",transition:"all 0.2s",fontFamily:"'DM Sans',sans-serif",cursor:"pointer"}}
+      onMouseEnter={e=>{e.currentTarget.style.boxShadow="0 8px 30px #7c3aed22";e.currentTarget.style.borderColor="#7c3aed60";e.currentTarget.style.transform="translateY(-2px)";}}
+      onMouseLeave={e=>{e.currentTarget.style.boxShadow="0 1px 4px rgba(0,0,0,0.06)";e.currentTarget.style.borderColor="#e2e8f0";e.currentTarget.style.transform="translateY(0)";}}>
+      <div style={{position:"absolute",top:0,left:0,right:0,height:4,background:"#7c3aed",borderRadius:"16px 16px 0 0"}}/>
+      <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:14,marginTop:6}}>
+        <span style={{fontSize:20}}>🏡</span>
+        <div>
+          <div style={{fontSize:15,fontWeight:600,color:"#0f172a",fontFamily:"'DM Serif Display',serif"}}>Common Expenses</div>
+          <div style={{fontSize:11,color:"#94a3b8",marginTop:2}}>Use of home, travel &amp; shared landlord costs</div>
+        </div>
+      </div>
+      {/* mini monthly bars */}
+      <div style={{display:"flex",alignItems:"flex-end",gap:3,height:44,padding:"0 2px",marginBottom:14}}>
+        {MONTHS.map(m=>{
+          const v=commonMonthTotal(data,m);
+          const maxVal=Math.max(...MONTHS.map(mx=>commonMonthTotal(data,mx)),1);
+          return(
+            <div key={m} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+              <div style={{width:"100%",background:"#7c3aed",borderRadius:"2px 2px 0 0",height:`${(v/maxVal)*36}px`,minHeight:v>0?2:0,transition:"height 0.4s",opacity:0.7}}/>
+              <span style={{fontSize:8,color:"#94a3b8"}}>{m}</span>
+            </div>
+          );
+        })}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+        {COMMON_EXPENSE_FIELDS.slice(0,4).map(f=>{
+          const a=commonAnnualSum(data,f.key);
+          return a===0?null:(
+            <div key={f.key} style={{background:"#faf5ff",borderRadius:9,padding:"7px 10px",border:"1px solid #e9d5ff"}}>
+              <div style={{fontSize:9,color:"#7c3aed",marginBottom:2,fontWeight:600,textTransform:"uppercase",letterSpacing:0.8}}>{f.label}</div>
+              <div style={{fontSize:13,fontWeight:700,color:"#0f172a"}}>{fmt(a)}</div>
+            </div>
+          );
+        }).filter(Boolean)}
+        <div style={{background:"#faf5ff",borderRadius:9,padding:"7px 10px",border:"1px solid #e9d5ff",gridColumn:total===0?"1 / -1":undefined}}>
+          <div style={{fontSize:9,color:"#7c3aed",marginBottom:2,fontWeight:700,textTransform:"uppercase",letterSpacing:0.8}}>ANNUAL TOTAL</div>
+          <div style={{fontSize:16,fontWeight:700,color:total===0?"#e2e8f0":"#7c3aed"}}>{total===0?"£ —":fmt(total)}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Common Expenses Detail ────────────────────────────────────────────────────
+function CommonExpensesDetail({data, onChange, onBack}) {
+  const [activeMonth, setActiveMonth] = useState(MONTHS[0]);
+  const [editingCell, setEditingCell] = useState(null);
+  const handleChange = (m,k,v) => onChange(prev => ({...prev, [m]:{...prev[m],[k]:v}}));
+  const annualTot = commonAnnualTotal(data);
+
+  return (
+    <div style={{minHeight:"100vh",background:"#f8fafc",color:"#0f172a",fontFamily:"'DM Sans',sans-serif"}}>
+      {/* Header */}
+      <div style={{background:"#fff",borderBottom:"1px solid #e2e8f0",padding:"18px 28px",boxShadow:"0 1px 3px rgba(0,0,0,0.06)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:18}}>
+          <button onClick={onBack} style={{background:"#f1f5f9",border:"1px solid #e2e8f0",color:"#475569",cursor:"pointer",borderRadius:8,padding:"8px 14px",fontSize:13,fontFamily:"'DM Sans',sans-serif"}}>← Back</button>
+          <span style={{fontSize:20}}>🏡</span>
+          <h2 style={{margin:0,fontFamily:"'DM Serif Display',serif",fontSize:20,color:"#0f172a"}}>Common Expenses</h2>
+          <span style={{color:"#94a3b8",fontSize:13}}>Use of home, travel &amp; shared landlord costs</span>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",gap:12}}>
+          {COMMON_EXPENSE_FIELDS.map(f=>{
+            const a=commonAnnualSum(data,f.key);
+            return(
+              <div key={f.key} style={{background:"#faf5ff",borderRadius:12,padding:"14px 18px",border:"1px solid #e9d5ff"}}>
+                <div style={{fontSize:10,color:"#7c3aed",marginBottom:4,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600}}>{f.label}</div>
+                <div style={{fontSize:20,fontWeight:700,color:a===0?"#d8b4fe":"#7c3aed"}}>{a===0?"—":fmt(a)}</div>
+              </div>
+            );
+          })}
+          <div style={{background:"#f0fdf4",borderRadius:12,padding:"14px 18px",border:"1px solid #bbf7d0",gridColumn:COMMON_EXPENSE_FIELDS.length%4===0?"1":"auto"}}>
+            <div style={{fontSize:10,color:"#16a34a",marginBottom:4,textTransform:"uppercase",letterSpacing:1.2,fontWeight:600}}>Annual Total</div>
+            <div style={{fontSize:20,fontWeight:700,color:annualTot===0?"#86efac":"#16a34a"}}>{annualTot===0?"—":fmt(annualTot)}</div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{display:"flex",height:"calc(100vh - 210px)"}}>
+        {/* Month sidebar */}
+        <div style={{width:150,background:"#fff",borderRight:"1px solid #e2e8f0",padding:"12px 0",overflowY:"auto",flexShrink:0}}>
+          {MONTHS.map((m,i)=>{
+            const t=commonMonthTotal(data,m);
+            const isA=m===activeMonth;
+            return(
+              <div key={m} onClick={()=>setActiveMonth(m)} style={{padding:"10px 16px",cursor:"pointer",background:isA?"#7c3aed12":"transparent",borderLeft:`3px solid ${isA?"#7c3aed":"transparent"}`,transition:"all 0.15s"}}>
+                <div style={{fontSize:13,fontWeight:isA?600:400,color:isA?"#0f172a":"#64748b"}}>{MONTH_FULL[i]}</div>
+                <div style={{fontSize:11,color:"#7c3aed",marginTop:1}}>{t>0?fmt(t):"—"}</div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Input area */}
+        <div style={{flex:1,overflow:"auto",padding:"22px 26px",background:"#f8fafc"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:20}}>
+            <h3 style={{margin:0,fontFamily:"'DM Serif Display',serif",color:"#0f172a",fontSize:18}}>{MONTH_FULL[MONTHS.indexOf(activeMonth)]}</h3>
+            <span style={{fontSize:13,color:"#7c3aed"}}>Month total: <strong>{fmt(commonMonthTotal(data,activeMonth))}</strong></span>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16,padding:"10px 14px",background:"#faf5ff",borderRadius:10,border:"1px solid #e9d5ff"}}>
+            <span style={{fontSize:18}}>ℹ️</span>
+            <span style={{fontSize:12,color:"#6d28d9",lineHeight:1.5}}>These are shared landlord expenses not tied to a single property — e.g. home-office portion of household bills, mileage to visit properties, business phone, stationery.</span>
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(230px,1fr))",gap:10}}>
+            {COMMON_EXPENSE_FIELDS.map(f=>{
+              const val = data?.[activeMonth]?.[f.key] ?? "";
+              const cellId = `${activeMonth}-${f.key}`;
+              const isE = editingCell === cellId;
+              return(
+                <div key={f.key} onClick={()=>setEditingCell(cellId)} style={{background:"#fff",borderRadius:10,padding:"12px 14px",border:`1px solid ${isE?"#7c3aed80":"#e2e8f0"}`,cursor:"pointer",transition:"border 0.2s",boxShadow:"0 1px 2px rgba(0,0,0,0.04)"}}>
+                  <div style={{fontSize:10,color:"#94a3b8",marginBottom:4,fontWeight:500}}>{f.label}</div>
+                  {isE?(
+                    <input autoFocus value={val} onChange={e=>handleChange(activeMonth,f.key,e.target.value)}
+                      onBlur={()=>setEditingCell(null)} onKeyDown={e=>e.key==="Enter"&&setEditingCell(null)}
+                      placeholder="0.00"
+                      style={{background:"transparent",border:"none",outline:"none",color:"#0f172a",fontSize:15,fontWeight:700,width:"100%",fontFamily:"'DM Sans',sans-serif"}}/>
+                  ):(
+                    <div style={{fontSize:15,fontWeight:700,color:val?"#7c3aed":"#e2e8f0"}}>{val?fmt(val):"£ —"}</div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Annual sidebar */}
+        <div style={{width:190,background:"#fff",borderLeft:"1px solid #e2e8f0",padding:"16px 14px",overflowY:"auto",flexShrink:0}}>
+          <div style={{fontSize:10,color:"#94a3b8",textTransform:"uppercase",letterSpacing:1.2,fontWeight:700,marginBottom:14}}>Annual Totals</div>
+          {COMMON_EXPENSE_FIELDS.map(f=>{
+            const a=commonAnnualSum(data,f.key);
+            if(a===0) return null;
+            return(
+              <div key={f.key} style={{marginBottom:10,paddingBottom:10,borderBottom:"1px solid #f1f5f9"}}>
+                <div style={{fontSize:10,color:"#94a3b8"}}>{f.label}</div>
+                <div style={{fontSize:13,fontWeight:700,color:"#7c3aed"}}>{fmt(a)}</div>
+              </div>
+            );
+          })}
+          <div style={{marginTop:12,paddingTop:12,borderTop:"2px solid #e9d5ff"}}>
+            <div style={{fontSize:10,color:"#7c3aed",fontWeight:700}}>TOTAL</div>
+            <div style={{fontSize:16,fontWeight:700,color:annualTot===0?"#d8b4fe":"#7c3aed"}}>{annualTot===0?"—":fmt(annualTot)}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Quarterly Report ─────────────────────────────────────────────────────────
 function QuarterlyReport({properties,allData,taxYear}) {
   const propIds=properties.map(p=>p.id);
@@ -634,6 +804,7 @@ function TaxReturnSummary({properties,allData}) {
 function Dashboard({currentUser, onLogout, clients, onClientsChange}) {
   const [activeTab,setActiveTab]=useState("properties");
   const [selectedProperty,setSelected]=useState(null);
+  const [viewCommon,setViewCommon]=useState(false);
   const [showAddModal,setShowAdd]=useState(false);
   const [showAdminPanel,setShowAdminPanel]=useState(false);
   const [deleteTarget,setDeleteTarget]=useState(null);
@@ -657,11 +828,13 @@ function Dashboard({currentUser, onLogout, clients, onClientsChange}) {
   },[viewingClientId]);
 
   // Storage keys scoped to client + year
-  const propsKey = viewingClient ? storageKey(viewingClient.id, activeTaxYear, "props") : null;
-  const dataKey  = viewingClient ? storageKey(viewingClient.id, activeTaxYear, "data")  : null;
+  const propsKey  = viewingClient ? storageKey(viewingClient.id, activeTaxYear, "props")  : null;
+  const dataKey   = viewingClient ? storageKey(viewingClient.id, activeTaxYear, "data")   : null;
+  const commonKey = viewingClient ? storageKey(viewingClient.id, activeTaxYear, "common") : null;
 
   const [properties,setProperties]=useState([]);
   const [allData,setAllData]=useState({});
+  const [commonData,setCommonData]=useState({});
   const [loaded,setLoaded]=useState(false);
 
   // Load data when client or year changes
@@ -672,16 +845,19 @@ function Dashboard({currentUser, onLogout, clients, onClientsChange}) {
       try{
         const sp = await getDoc(doc(db, "ztStore", propsKey));
         const sd = await getDoc(doc(db, "ztStore", dataKey));
+        const sc = await getDoc(doc(db, "ztStore", commonKey));
         setProperties(sp.exists() ? sp.data().value : []);
         setAllData(sd.exists() ? sd.data().value : {});
-      } catch(e){ setProperties([]); setAllData({}); }
+        setCommonData(sc.exists() ? sc.data().value : makeEmptyCommonData());
+      } catch(e){ setProperties([]); setAllData({}); setCommonData(makeEmptyCommonData()); }
       setLoaded(true);
     })();
-  },[propsKey,dataKey]);
+  },[propsKey,dataKey,commonKey]);
 
   // Save on change
-  useEffect(()=>{ if(loaded&&propsKey) setDoc(doc(db,"ztStore",propsKey),{value:properties}); },[properties,loaded]);
-  useEffect(()=>{ if(loaded&&dataKey)  setDoc(doc(db,"ztStore",dataKey),{value:allData}); },[allData,loaded]);
+  useEffect(()=>{ if(loaded&&propsKey)  setDoc(doc(db,"ztStore",propsKey),{value:properties}); },[properties,loaded]);
+  useEffect(()=>{ if(loaded&&dataKey)   setDoc(doc(db,"ztStore",dataKey),{value:allData}); },[allData,loaded]);
+  useEffect(()=>{ if(loaded&&commonKey) setDoc(doc(db,"ztStore",commonKey),{value:commonData}); },[commonData,loaded]);
 
   const addProperty=prop=>{const id="p"+Date.now();setProperties(prev=>[...prev,{...prop,id}]);setAllData(prev=>({...prev,[id]:makeEmptyData()}));};
   const confirmDelete=()=>{const id=deleteTarget;setProperties(prev=>prev.filter(p=>p.id!==id));setAllData(prev=>{const d={...prev};delete d[id];return d;});setDeleteTarget(null);};
@@ -701,12 +877,17 @@ function Dashboard({currentUser, onLogout, clients, onClientsChange}) {
 
   const grandIncome  =properties.reduce((s,p)=>s+calcTotals(allData[p.id]||{}).totalIncome,0);
   const grandExpenses=properties.reduce((s,p)=>s+calcTotals(allData[p.id]||{}).totalExpenses,0);
-  const grandNet     =grandIncome-grandExpenses;
+  const grandCommon  =commonAnnualTotal(commonData||{});
+  const grandNet     =grandIncome-grandExpenses-grandCommon;
 
   if(selectedProperty){
     const prop=properties.find(p=>p.id===selectedProperty);
     if(!prop){setSelected(null);return null;}
     return <PropertyDetail property={prop} data={allData[selectedProperty]||makeEmptyData()} onChange={updateData(selectedProperty)} onBack={()=>setSelected(null)}/>;
+  }
+
+  if(viewCommon){
+    return <CommonExpensesDetail data={commonData||makeEmptyCommonData()} onChange={setCommonData} onBack={()=>setViewCommon(false)}/>;
   }
 
   const availableYearsToAdd = TAX_YEARS.filter(y=>!clientTaxYears.includes(y));
@@ -804,7 +985,7 @@ function Dashboard({currentUser, onLogout, clients, onClientsChange}) {
       <div style={{background:"#fff",borderBottom:"1px solid #e2e8f0",padding:"10px 28px",display:"flex",gap:16,alignItems:"center"}}>
         <span style={{fontSize:12,color:"#94a3b8",fontWeight:600}}>{viewingClient?.name||""} · {activeTaxYear}</span>
         <div style={{width:1,height:20,background:"#e2e8f0"}}/>
-        {[{label:"Total Income",value:grandIncome,color:"#16a34a",bg:"#f0fdf4"},{label:"Total Expenses",value:grandExpenses,color:"#dc2626",bg:"#fef2f2"},{label:"Net Profit",value:grandNet,color:grandNet>=0?"#16a34a":"#dc2626",bg:grandNet>=0?"#f0fdf4":"#fef2f2"}].map((s,i)=>(
+        {[{label:"Total Income",value:grandIncome,color:"#16a34a",bg:"#f0fdf4"},{label:"Property Expenses",value:grandExpenses,color:"#dc2626",bg:"#fef2f2"},{label:"Common Expenses",value:grandCommon,color:"#7c3aed",bg:"#faf5ff"},{label:"Net Profit",value:grandNet,color:grandNet>=0?"#16a34a":"#dc2626",bg:grandNet>=0?"#f0fdf4":"#fef2f2"}].map((s,i)=>(
           <div key={i} style={{background:s.bg,padding:"5px 14px",borderRadius:8,display:"flex",alignItems:"center",gap:8}}>
             <span style={{fontSize:11,color:"#94a3b8",textTransform:"uppercase",letterSpacing:0.8,fontWeight:600}}>{s.label}</span>
             <span style={{fontSize:14,fontWeight:700,color:s.color}}>{fmt(s.value)}</span>
@@ -828,16 +1009,22 @@ function Dashboard({currentUser, onLogout, clients, onClientsChange}) {
             </button>
           </div>
           {properties.length===0?(
-            <div style={{textAlign:"center",padding:"80px 0",color:"#94a3b8"}}>
-              <div style={{fontSize:48,marginBottom:14}}>🏠</div>
-              <div style={{fontSize:17,fontFamily:"'DM Serif Display',serif",color:"#475569",marginBottom:5}}>No properties for {activeTaxYear}</div>
-              <div style={{fontSize:13}}>Click "+ Add Property" to get started</div>
+            <div>
+              <div style={{textAlign:"center",padding:"60px 0 28px",color:"#94a3b8"}}>
+                <div style={{fontSize:48,marginBottom:14}}>🏠</div>
+                <div style={{fontSize:17,fontFamily:"'DM Serif Display',serif",color:"#475569",marginBottom:5}}>No properties for {activeTaxYear}</div>
+                <div style={{fontSize:13}}>Click "+ Add Property" to get started</div>
+              </div>
+              <div style={{maxWidth:360,margin:"0 auto"}}>
+                <CommonExpensesCard data={commonData||makeEmptyCommonData()} onSelect={()=>setViewCommon(true)}/>
+              </div>
             </div>
           ):(
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(330px,1fr))",gap:18}}>
               {properties.map(p=>(
                 <PropertyCard key={p.id} property={p} data={allData[p.id]||makeEmptyData()} onSelect={setSelected} onDelete={setDeleteTarget}/>
               ))}
+              <CommonExpensesCard data={commonData||makeEmptyCommonData()} onSelect={()=>setViewCommon(true)}/>
             </div>
           )}
         </div>
